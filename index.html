@@ -121,6 +121,25 @@
           class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
       </div>
 
+      <!-- Foto Paket -->
+      <div>
+        <label class="text-sm font-semibold text-gray-700 mb-1 block">Foto Paket</label>
+        <input id="fotoInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFotoSelected(event)">
+
+        <div id="fotoEmptyState" onclick="document.getElementById('fotoInput').click()"
+          class="cursor-pointer border-2 border-dashed border-gray-300 rounded-xl py-6 flex flex-col items-center justify-center gap-1.5 text-gray-400 active:bg-gray-50">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M1 5a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 0h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 3H17a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V5zm12 6a3 3 0 11-6 0 3 3 0 016 0z" clip-rule="evenodd"/></svg>
+          <span class="text-xs font-medium">Ambil / Pilih Foto Paket</span>
+        </div>
+
+        <div id="fotoPreviewWrap" class="hidden relative">
+          <img id="fotoPreview" class="w-full h-40 object-cover rounded-xl border border-gray-200">
+          <button type="button" onclick="clearFoto()" class="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+      </div>
+
       <p id="formError" class="hidden text-sm text-red-500"></p>
 
       <button id="btnSimpan" onclick="submitDropOff()" class="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl active:bg-emerald-700 flex items-center justify-center gap-2">
@@ -171,6 +190,8 @@ let currentCourier = null;
 let html5QrCode = null;
 let scanFilledValue = "";
 let isSaving = false;
+let fotoBase64 = "";   // without the "data:image/..;base64," prefix
+let fotoMimeType = "";
 
 /* ==========================================================================
    INIT
@@ -223,6 +244,7 @@ function openModal(courier) {
   document.getElementById("formError").classList.add("hidden");
   document.getElementById("btnStartScan").classList.remove("hidden");
   document.getElementById("btnStopScan").classList.add("hidden");
+  clearFoto();
 
   document.getElementById("modalOverlay").classList.remove("hidden");
   document.getElementById("modalOverlay").classList.add("flex");
@@ -292,6 +314,69 @@ function stopScan() {
 }
 
 /* ==========================================================================
+   FOTO PAKET
+   ========================================================================== */
+function handleFotoSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  compressImage(file, 1024, 0.7)
+    .then(({ base64, mimeType }) => {
+      fotoBase64 = base64;
+      fotoMimeType = mimeType;
+      document.getElementById("fotoPreview").src = "data:" + mimeType + ";base64," + base64;
+      document.getElementById("fotoEmptyState").classList.add("hidden");
+      document.getElementById("fotoPreviewWrap").classList.remove("hidden");
+      document.getElementById("fotoPreviewWrap").classList.add("block");
+    })
+    .catch(() => {
+      showFormError("Gagal memproses foto. Coba ambil ulang.");
+    });
+
+  event.target.value = "";
+}
+
+function clearFoto() {
+  fotoBase64 = "";
+  fotoMimeType = "";
+  document.getElementById("fotoPreview").src = "";
+  document.getElementById("fotoEmptyState").classList.remove("hidden");
+  document.getElementById("fotoPreviewWrap").classList.add("hidden");
+  document.getElementById("fotoPreviewWrap").classList.remove("block");
+}
+
+// Resizes + re-encodes the photo as JPEG client-side so the upload stays
+// small and fast (phone camera photos are often several MB otherwise).
+function compressImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve({ base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ==========================================================================
    SUBMIT
    ========================================================================== */
 function showFormError(msg) {
@@ -327,18 +412,25 @@ function submitDropOff() {
   document.getElementById("btnSimpanSpinner").classList.remove("hidden");
   document.getElementById("btnSimpan").disabled = true;
 
-  // GET + query string on purpose: avoids CORS preflight (which Apps Script
-  // Web Apps don't handle) and avoids POST-redirect body-loss issues when
-  // this page is hosted on a different domain (GitHub Pages / Vercel).
-  const qs = new URLSearchParams({
+  // POST + Content-Type "text/plain" on purpose: the photo payload is too
+  // big for a GET query string, and "text/plain" keeps this a CORS "simple
+  // request" (no preflight OPTIONS call, which Apps Script doesn't handle)
+  // even though this page is hosted on a different domain than the API.
+  const payload = {
     action: "saveDropOff",
     courier: currentCourier.key,
     noResi: noResi,
     lokasi: currentLokasi,
     penerima: penerima,
-  });
+    fotoBase64: fotoBase64,
+    fotoMimeType: fotoMimeType,
+  };
 
-  fetch(WEB_APP_URL + "?" + qs.toString(), { method: "GET" })
+  fetch(WEB_APP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  })
     .then((res) => res.json())
     .then((data) => {
       isSaving = false;
