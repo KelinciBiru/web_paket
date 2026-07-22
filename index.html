@@ -561,7 +561,7 @@ function submitDropOff() {
     showFormError("Nama penerima wajib diisi.");
     return;
   }
-  if (!WEB_APP_URL || WEB_APP_URL === "PASTE_WEB_APP_URL_DISINI") {
+  if (!WEB_APP_URL || WEB_APP_URL === "https://script.google.com/macros/s/AKfycbxNLuCbgleVC-GOXtPLtPTi-VRr7CuYLaU_1VGWC13cbmgAlPCpEURIWFxPooy99BaJ/exec") {
     showFormError("Web App URL belum dikonfigurasi. Hubungi admin.");
     return;
   }
@@ -641,7 +641,7 @@ function submitJumpstart() {
   if (!penerima) { showJsFormError("Penerima wajib diisi."); return; }
   if (!diterimaOleh) { showJsFormError("Diterima Oleh wajib diisi."); return; }
   if (!currentLokasi) { showJsFormError("Lokasi tidak terdeteksi. Scan ulang QR Code Lobby/Office."); return; }
-  if (!WEB_APP_URL || WEB_APP_URL === "PASTE_WEB_APP_URL_DISINI") {
+  if (!WEB_APP_URL || WEB_APP_URL === "https://script.google.com/macros/s/AKfycbxNLuCbgleVC-GOXtPLtPTi-VRr7CuYLaU_1VGWC13cbmgAlPCpEURIWFxPooy99BaJ/exec") {
     showJsFormError("Web App URL belum dikonfigurasi. Hubungi admin.");
     return;
   }
